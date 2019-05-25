@@ -46,6 +46,7 @@ func (lock *Lock) TryLockAWaitInterval(key string, expire time.Duration,
 	lock.e = expire
 	for stop := time.Now().Add(wait); ; {
 		b, err := lock.nxSet()
+		fmt.Println(b, err)
 		if b {
 			return b, err
 		}
@@ -65,13 +66,17 @@ func (lock *Lock) Unlock() (bool, error) {
 
 func (lock *Lock) nxSet() (bool, error) {
 	c := lock.p.Get()
+	fmt.Println("==========", c)
 	defer c.Close()
 	if c.Err() != nil {
 		return false, c.Err()
 	}
 	key := fmt.Sprintf("%s.%s", lock.m, lock.k)
-	v, err := redis.Bool(c.Do("SET", key, lock.v, "NX", "EX", lock.e.Seconds))
-	return v, err
+	v, err := redis.String(c.Do("SET", key, lock.v, "NX", "EX", lock.e.Seconds()))
+	if v == "OK" {
+		return true, err
+	}
+	return false, err
 }
 
 func (lock *Lock) del() (bool, error) {
