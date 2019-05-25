@@ -10,7 +10,6 @@ const (
 )
 
 // Distributed lock interface
-
 type Lock interface {
 	Lock(key string, expire time.Duration) error
 	TryLock(key string, expire time.Duration) (bool, error)
