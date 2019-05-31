@@ -18,7 +18,6 @@ func TestLock(t *testing.T) {
 		t.Error(b)
 	}
 	defer lock.Unlock()
-	time.Sleep(200 * time.Second)
 }
 
 func pool() *redis.Pool {
