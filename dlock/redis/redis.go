@@ -4,69 +4,59 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/zhaoche27/dbi/dlock"
-
 	"github.com/gomodule/redigo/redis"
 	uuid "github.com/satori/go.uuid"
-)
-
-var (
-	keyEmptry   = fmt.Errorf("key is emptry")
-	lockTimeout = fmt.Errorf("Get lock timeout")
+	"github.com/zhaoche27/dbi/dlock"
 )
 
 // Distributed lock is Redis lock adapter.
 type Lock struct {
+	dlock.BaseLock
 	p *redis.Pool   // redis connection pool
 	m string        // module
 	k string        // key
 	e time.Duration // expire
 	v string        // value, default uuid
+	l bool
 }
 
-func NewLock(p *redis.Pool, m string) dlock.Lock {
+func NewLock(p *redis.Pool, m string) *Lock {
 	v := uuid.NewV4().String()
-	return &Lock{p: p, m: m, v: v}
+	lock := &Lock{p: p, m: m, v: v}
+	lock.Locker = lock
+	return lock
 }
 
-func (lock *Lock) Lock(key string, expire time.Duration) error {
-	_, err := lock.TryLockAwait(key, expire, dlock.DefaultWait)
-	return err
-}
-func (lock *Lock) TryLock(key string, expire time.Duration) (bool, error) {
-	return lock.TryLockAwait(key, expire, 0)
-}
-func (lock *Lock) TryLockAwait(key string, expire time.Duration, wait time.Duration) (bool, error) {
-	return lock.TryLockAWaitInterval(key, expire, wait, dlock.DefaultInteval)
-}
-
-func (lock *Lock) TryLockAWaitInterval(key string, expire time.Duration,
+func (lock *Lock) LockAWaitInterval(key string, expire time.Duration,
 	wait time.Duration, interval time.Duration) (bool, error) {
 	lock.k = key
 	lock.e = expire
+	lock.l = false
 	for stop := time.Now().Add(wait); ; {
 		b, err := lock.nxSet()
-		fmt.Println(b, err)
 		if b {
+			lock.l = true
 			return b, err
 		}
 		time.Sleep(interval)
 		if time.Now().After(stop) {
-			return false, lockTimeout
+			return false, dlock.WaitTimeout
 		}
 	}
 }
 
 func (lock *Lock) Unlock() (bool, error) {
+	if !lock.l {
+		return false, nil
+	}
 	if lock.k == "" {
-		return false, keyEmptry
+		return false, dlock.KeyEmptry
 	}
 	return lock.del()
 }
 
 func (lock *Lock) nxSet() (bool, error) {
 	c := lock.p.Get()
-	fmt.Println("==========", c)
 	defer c.Close()
 	if c.Err() != nil {
 		return false, c.Err()

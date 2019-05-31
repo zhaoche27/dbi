@@ -1,7 +1,6 @@
 package redis
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -10,15 +9,16 @@ import (
 
 func TestLock(t *testing.T) {
 	lock := NewLock(pool(), "test")
-	fmt.Println("-------------", lock)
-	b, err := lock.TryLockAWaitInterval("key1", 20*time.Second, 20*time.Second, 5*time.Second)
+	b, err := lock.TryLockAWaitInterval("key1", 300*time.Second, 10*time.Second, 5*time.Second)
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	fmt.Println("0000", b)
+	if !b {
+		t.Error(b)
+	}
 	defer lock.Unlock()
-	time.Sleep(10 * time.Second)
+	time.Sleep(200 * time.Second)
 }
 
 func pool() *redis.Pool {
